@@ -24,6 +24,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m di_tts render examples/demo_script.txt -o out/demo.wav   # also writes out/demo.timeline.json
 .venv/bin/python -m di_tts list
 .venv/bin/python -m di_tts render script.txt --backend tone    # force one backend for all voices
+.venv/bin/python -m di_tts lab -v alice -e sad,happy -i 0.2,1.0  # render + measure emotions (out/lab/)
 
 docker build -t di-tts . && docker run --rm -p 8000:8000 di-tts
 ```
@@ -35,16 +36,32 @@ There is no linter or formatter configured.
 The pipeline is in `di_tts/engine.py` (`TTSEngine.render_lines`):
 
 ```
-script text → parse_script() → ScriptLine[] → resolve() → Utterance (voice + combined Prosody)
-  → chunk_text() (sentence split, ≤240 chars) → backend.synthesize() → AudioClip
-  → post-process fallbacks → resample to project rate → concat with pauses → WAV + timeline
+script text → parse_script() → ScriptLine[] → resolve() → Utterance
+      (voice prosody ⊕ emotion prosody scaled by intensity; shape_text() punctuation; effects scaled)
+  → _pieces(): chunk_text() sentences, split_clauses() when clause_pause_ms > 0
+  → per piece: backend.synthesize() → normalize to -20 dBFS → ffmpeg pitch fallback
+      → emotion effects (loudness-matched) → gain(volume_db, soft limiter) → resample + fade
+  → concat with sentence/clause/line pauses → WAV + timeline (timeline shows the original text)
 ```
 
 Key points that span several files:
 
 - **Backends** (`di_tts/backends/`) implement `TTSBackend.synthesize(Utterance) -> AudioClip` and register by name with `register_backend()`. Registration is a side effect of importing `di_tts.backends`, so new backend modules must be imported in `backends/__init__.py`.
-- **Prosody controls:** each backend declares the controls it handles natively in `supports`. For the rest, the engine applies fallbacks: volume via `AudioClip.gain`, pitch via ffmpeg in `audio.pitch_shift`. If ffmpeg is missing, pitch is skipped with a warning.
-- **Prosody layering** (`models.Prosody`): `voice.prosody.combine(emotion.prosody.scaled(intensity))`. Rates multiply, pitch and volume add, the pause takes the max, and intensity 0..1 interpolates from neutral. Emotions are prosody-only for now; no backend has native emotion support yet.
+- **Prosody controls:** each backend declares the controls it handles natively in `supports` (`rate`, `pitch_semitones`, `rhythm_variation`, and `emotion` for a future engine with native emotion control). Pitch falls back to ffmpeg; if ffmpeg is missing, it is skipped with a warning.
+- **Volume:** backends must **not** apply volume. The engine normalizes every piece to `REFERENCE_LOUDNESS_DBFS`, because Piper peak-normalizes each call, which made short clauses about 3 dB louder. It then applies `volume_db` itself.
+- **Prosody layering** (`models.Prosody`): `voice.prosody.combine(emotion.prosody.scaled(intensity))`.
+  - Rates, `pause_scale` and `rhythm_variation` multiply; pitch, volume and `clause_pause_ms` add; `pause_after_ms` takes the max.
+  - Intensity 0..1 interpolates every field from neutral, so intensity 0 equals neutral (this is tested).
+  - Every new `Prosody` field must default to a no-op, so older config files keep working.
+- **Emotions** (`config/emotions.json`, validated in `registry.py`). Each emotion has:
+  - `label`
+  - `category` (basic / advanced / style)
+  - `prosody`
+  - `text` (`exclaim_at` / `soften_at` thresholds; see `script.shape_text`)
+  - `effects` (types from `effects.EFFECTS`; the amount is multiplied by intensity)
+- **Honesty labels:** `engine.realization()` reports each emotion as baseline / approximated / simulated / native / placeholder. The API and UI show it. Never label something native unless the backend really controls emotion.
+- **Effects** (`effects.py`) are ffmpeg `-filter_complex` graphs. Stages are joined with `aformat=s16`: ffmpeg 4.4's vibrato emitted invalid samples that silenced later stages. Keep that when adding effects, and re-run the all-pairs check.
+- **Measuring audio:** `analysis.measure()` (numpy) backs `di_tts lab`, `/api/say {analyze: true}` and `tests/test_emotions.py::AudioTests`. Those tests skip without Piper, the models, numpy or ffmpeg. Piper's timing is random by about ±5%, so audio-test thresholds must stay well above that.
 - **Voices and emotions are data, not code:**
   - Voices: `config/voices/*.json` (backend, `backend_options`, default prosody, aliases, `fallback_backend`).
   - Emotions: `config/emotions.json`.

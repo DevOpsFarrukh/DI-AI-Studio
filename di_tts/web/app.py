@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .. import analysis
 from ..backends import BackendUnavailable
 from ..engine import RenderResult, TTSEngine
 from ..models import ScriptLine
@@ -56,6 +57,11 @@ class SayRequest(BaseModel):
     voice: str = "narrator"
     emotion: str = "neutral"
     intensity: float = Field(default=1.0, ge=0.0, le=1.0)
+    analyze: bool = False  # include acoustic measurements (Emotion Lab)
+
+
+# Deliveries the current Piper-based setup cannot produce, shown in the UI so nobody expects them.
+NOT_SUPPORTED = ["crying", "laughing", "sarcasm", "true shouting", "genuine whispering (only simulated)"]
 
 
 class ScriptRequest(BaseModel):
@@ -74,7 +80,15 @@ def _cleanup() -> None:
         f.with_suffix(".timeline.json").unlink(missing_ok=True)
 
 
-def _run(lines: list[ScriptLine]) -> dict:
+def _default_backend() -> str:
+    """Backend whose capabilities the UI describes: the override, else the most common voice backend."""
+    if engine.backend_override:
+        return engine.backend_override
+    names = [v.backend for v in engine.voices.all()]
+    return max(set(names), key=names.count) if names else "tone"
+
+
+def _run(lines: list[ScriptLine], analyze: bool = False) -> dict:
     t0 = time.perf_counter()
     try:
         with _render_lock:
@@ -86,7 +100,7 @@ def _run(lines: list[ScriptLine]) -> dict:
     rid = uuid.uuid4().hex[:16]
     result.save(OUTPUT / f"{rid}.wav")
     _cleanup()
-    return {
+    out = {
         "id": rid,
         "audio_url": f"/api/audio/{rid}.wav",
         "duration_s": round(result.audio.duration_s, 2),
@@ -94,6 +108,9 @@ def _run(lines: list[ScriptLine]) -> dict:
         "warnings": result.warnings,
         "timeline": [e.__dict__ for e in result.timeline],
     }
+    if analyze and analysis.available():
+        out["metrics"] = analysis.measure(result.audio)
+    return out
 
 
 @app.get("/api/health")
@@ -103,9 +120,20 @@ def health() -> dict:
 
 @app.get("/api/voices", dependencies=[Depends(require_key)])
 def voices() -> dict:
+    backend = _default_backend()
+    details = []
+    for e in engine.emotions.all():
+        r = engine.realization(e.name, backend)
+        details.append({"name": e.name, "label": e.display, "category": e.category,
+                        "description": e.description, "realization": r["level"],
+                        "realization_notes": r["notes"], "available": r["available"]})
     return {
         "voices": [{"id": v.id, "name": v.display_name, "backend": v.backend} for v in engine.voices.all()],
-        "emotions": engine.emotions.names(),
+        "emotions": engine.emotions.names(),  # kept for backward compatibility
+        "emotion_details": details,
+        "backend": backend,
+        "not_supported": NOT_SUPPORTED,
+        "analysis": analysis.available(),
         "max_chars": MAX_CHARS,
     }
 
@@ -114,7 +142,7 @@ def voices() -> dict:
 def say(req: SayRequest) -> dict:
     text = " ".join(req.text.split())
     _check_len(text)
-    return _run([ScriptLine(req.voice.lower(), text, req.emotion.lower(), req.intensity, 1)])
+    return _run([ScriptLine(req.voice.lower(), text, req.emotion.lower(), req.intensity, 1)], analyze=req.analyze)
 
 
 @app.post("/api/render", dependencies=[Depends(require_key)])

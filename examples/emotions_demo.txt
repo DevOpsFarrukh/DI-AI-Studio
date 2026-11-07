@@ -1,0 +1,11 @@
+# Emotion demo: SPEAKER (emotion:intensity): text
+# Run: .venv/bin/python -m di_tts render examples/emotions_demo.txt -o out/emotions_demo.wav
+NARRATOR (serious:0.8): The city was silent. Nobody knew what was coming.
+ALICE (curious:0.9): Bob, did you hear that? Something is happening outside!
+BOB (fearful:0.8): I heard it. And honestly, I'm terrified.
+ALICE (urgent:1.0): We need to leave. Right now!
+BOB (sad:0.9): I thought we had more time.
+NARRATOR (dramatic:1.0): And suddenly, everything changed.
+ALICE (excited:1.0): We did it! We finally did it!
+BOB (whisper:0.8): Finally... we did it.
+NARRATOR (cinematic:0.9): And that, my friends, is how the story ends.

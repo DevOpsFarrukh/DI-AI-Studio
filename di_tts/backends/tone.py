@@ -1,7 +1,7 @@
 """Dependency-free placeholder backend.
 
 It does not produce intelligible speech. It renders a speech-like tone per
-syllable, honouring pitch, rate and volume. Use it to test the full pipeline
+syllable, honouring pitch and rate (the engine applies volume). Use it to test the full pipeline
 (parsing, voices, emotions, timing, assembly) on any machine, including CI.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ def _syllables(word: str) -> int:
 
 class ToneBackend(TTSBackend):
     name = "tone"
-    supports = frozenset({"rate", "pitch_semitones", "volume_db"})
+    supports = frozenset({"rate", "pitch_semitones"})
 
     def __init__(self, sample_rate: int = 22050) -> None:
         self.sample_rate = sample_rate
@@ -32,7 +32,7 @@ class ToneBackend(TTSBackend):
         opts = utt.voice.backend_options
         base_hz = float(opts.get("base_pitch_hz", 140)) * semitones_to_ratio(utt.prosody.pitch_semitones)
         syl_ms = float(opts.get("syllable_ms", 160)) / max(utt.prosody.rate, 0.1)
-        amp = 0.3 * 10 ** (utt.prosody.volume_db / 20)
+        amp = 0.3
         sr = self.sample_rate
         out = array.array("h")
         words = re.findall(r"[\w']+|[,.;:!?]", utt.text)
