@@ -1,0 +1,13 @@
+{
+  "id": "narrator",
+  "display_name": "Narrator",
+  "aliases": ["narration"],
+  "backend": "piper",
+  "fallback_backend": "tone",
+  "backend_options": {
+    "model": "../../models/en_US-ryan-medium.onnx",
+    "voice": "en-us", "wpm": 160, "pitch": 35,
+    "base_pitch_hz": 110, "syllable_ms": 170
+  },
+  "prosody": { "rate": 0.95, "pause_after_ms": 450 }
+}

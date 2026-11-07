@@ -1,0 +1,7 @@
+# Demo script: SPEAKER (emotion[:intensity]): text
+NARRATOR: The station was quiet, except for the hum of the old radio.
+ALICE: Bob, did you hear that signal?
+BOB (sad:0.6): I heard it. I was hoping it was nothing.
+ALICE (happy): It is not nothing. It is the answer we have been waiting for!
+  Continuation lines like this one stay with the previous speaker.
+NARRATOR (neutral): And so, the two of them leaned closer to listen.

@@ -1,0 +1,14 @@
+{
+  "neutral": {
+    "description": "Baseline delivery",
+    "prosody": {}
+  },
+  "happy": {
+    "description": "Brighter, slightly faster, slightly louder",
+    "prosody": { "rate": 1.1, "pitch_semitones": 2.0, "volume_db": 1.5 }
+  },
+  "sad": {
+    "description": "Slower, lower, softer, longer pauses",
+    "prosody": { "rate": 0.85, "pitch_semitones": -2.0, "volume_db": -3.0, "pause_after_ms": 600 }
+  }
+}

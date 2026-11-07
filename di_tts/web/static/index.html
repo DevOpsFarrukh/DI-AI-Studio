@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DI-AI Studio · Voice</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e2dc;
+    --accent: #3a5bd9; --accent-ink: #fff; --soft: #eef1fc; --warn: #9a5b00; --warn-bg: #fff4e0;
+    --err: #b42318; --err-bg: #fdecea; --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141416; --panel: #1c1c1f; --ink: #ececee; --muted: #9a9aa2; --line: #2e2e33;
+      --accent: #7d95ff; --accent-ink: #0f1020; --soft: #23263a; --warn: #f0b45c; --warn-bg: #2d2416;
+      --err: #ff8a80; --err-bg: #34191a; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 60px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  h1 span { color: var(--muted); font-weight: 500; }
+  .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: #2e9e5b; } .dot.bad { background: var(--err); }
+  .tabs { display: flex; gap: 4px; margin: 22px 0 14px; border-bottom: 1px solid var(--line); }
+  .tab { background: none; border: 0; padding: 10px 14px; font: inherit; color: var(--muted); cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab[aria-selected="true"] { color: var(--ink); border-color: var(--accent); font-weight: 600; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  textarea, select, input[type=password], input[type=text] {
+    width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; }
+  textarea { resize: vertical; min-height: 140px; }
+  textarea.script { font-family: var(--mono); font-size: 14px; min-height: 260px; }
+  textarea:focus, select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-top: 14px; }
+  .actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px;
+    padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .55; cursor: progress; }
+  button.ghost { background: none; border: 1px solid var(--line); color: var(--ink); border-radius: 8px;
+    padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .count { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .count.over { color: var(--err); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .msg { margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+  .msg.warn { background: var(--warn-bg); color: var(--warn); }
+  .msg.err { background: var(--err-bg); color: var(--err); }
+  .result { margin-top: 18px; }
+  .result audio { width: 100%; }
+  .meta { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+  .meta a { color: var(--accent); }
+  .timeline { list-style: none; padding: 0; margin: 14px 0 0; border-top: 1px solid var(--line); }
+  .timeline li { display: grid; grid-template-columns: 64px 110px 1fr; gap: 10px; padding: 9px 6px;
+    border-bottom: 1px solid var(--line); cursor: pointer; border-radius: 6px; }
+  .timeline li:hover { background: var(--soft); }
+  .timeline li.active { background: var(--soft); box-shadow: inset 3px 0 0 var(--accent); }
+  .t { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+  .who { font-weight: 600; font-size: 14px; }
+  .who small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .history { margin-top: 26px; }
+  .history h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0 0 8px; }
+  .history ul { list-style: none; margin: 0; padding: 0; }
+  .history li { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line);
+    font-size: 14px; }
+  .history li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history li button { flex: none; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .settings { margin-top: 14px; }
+  @media (max-width: 560px) { .timeline li { grid-template-columns: 56px 1fr; } .timeline li .txt { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>DI-AI Studio <span>· Voice</span></h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Connecting…</span></div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="quick">Quick speak</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="script">Script studio</button>
+  </div>
+
+  <!-- Quick speak -->
+  <section class="panel" id="tab-quick">
+    <label for="qText">Text</label>
+    <textarea id="qText" placeholder="Type anything you want spoken…">Hello! This is DI-AI Studio turning your text into speech.</textarea>
+    <div class="row">
+      <div><label for="qVoice">Voice</label><select id="qVoice"></select></div>
+      <div><label for="qEmotion">Emotion</label><select id="qEmotion"></select></div>
+      <div><label for="qIntensity">Intensity <span id="qIntVal">1.0</span></label>
+        <input type="range" id="qIntensity" min="0" max="1" step="0.1" value="1"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="qGo">Speak</button>
+      <span class="hint">Ctrl + Enter</span>
+      <span class="count" id="qCount"></span>
+    </div>
+    <div id="qOut"></div>
+  </section>
+
+  <!-- Script studio -->
+  <section class="panel" id="tab-script" hidden>
+    <label>Insert a speaker</label>
+    <div class="chips" id="chips"></div>
+    <textarea id="sText" class="script" spellcheck="false"></textarea>
+    <p class="hint">One line per utterance: <code>NAME: text</code> or <code>NAME (emotion:0.6): text</code>.
+      Lines starting with <code>#</code> are comments. An indented line continues the previous speaker.</p>
+    <div class="actions">
+      <button class="primary" id="sGo">Render script</button>
+      <span class="hint">Ctrl + Enter</span>
+      <span class="count" id="sCount"></span>
+    </div>
+    <div id="sOut"></div>
+  </section>
+
+  <section class="history">
+    <h2>Recent renders (this browser)</h2>
+    <ul id="history"></ul>
+  </section>
+
+  <details class="settings">
+    <summary class="hint">Settings</summary>
+    <div class="row">
+      <div><label for="apiKey">API key (only if the server requires one)</label>
+        <input type="password" id="apiKey" autocomplete="off"></div>
+    </div>
+  </details>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const SAMPLE = `# Script studio — edit me
+NARRATOR: The station was quiet, except for the hum of the old radio.
+ALICE: Bob, did you hear that signal?
+BOB (sad:0.6): I heard it. I was hoping it was nothing.
+ALICE (happy): It is not nothing. It is the answer we have been waiting for!
+NARRATOR: And so, the two of them leaned closer to listen.`;
+let maxChars = 5000;
+
+$("apiKey").value = store.get("apiKey", "");
+$("apiKey").addEventListener("change", () => { store.set("apiKey", $("apiKey").value); init(); });
+
+async function api(path, body) {
+  const headers = { "Content-Type": "application/json" };
+  const key = $("apiKey").value.trim();
+  if (key) headers["X-API-Key"] = key;
+  const res = await fetch(path, body ? { method: "POST", headers, body: JSON.stringify(body) } : { headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const d = data.detail;
+    throw new Error(Array.isArray(d) ? d.map((x) => x.msg).join("; ") : d || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+// Tabs
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", x === t));
+  $("tab-quick").hidden = t.dataset.tab !== "quick";
+  $("tab-script").hidden = t.dataset.tab !== "script";
+  store.set("tab", t.dataset.tab);
+}));
+if (store.get("tab") === "script") document.querySelector('[data-tab="script"]').click();
+
+// Character counters
+function counter(ta, el) {
+  const f = () => { el.textContent = `${ta.value.length.toLocaleString()} / ${maxChars.toLocaleString()}`;
+    el.classList.toggle("over", ta.value.length > maxChars); };
+  ta.addEventListener("input", f); f(); return f;
+}
+$("sText").value = store.get("script", SAMPLE);
+$("sText").addEventListener("input", () => store.set("script", $("sText").value));
+const counters = [counter($("qText"), $("qCount")), counter($("sText"), $("sCount"))];
+$("qIntensity").addEventListener("input", () => $("qIntVal").textContent = (+$("qIntensity").value).toFixed(1));
+
+async function init() {
+  try {
+    const h = await api("/api/health");
+    const v = await api("/api/voices");
+    maxChars = v.max_chars; counters.forEach((f) => f());
+    $("qVoice").innerHTML = v.voices.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+    $("qEmotion").innerHTML = v.emotions.map((e) => `<option${e === "neutral" ? " selected" : ""}>${e}</option>`).join("");
+    $("chips").innerHTML = v.voices.map((x) => `<button class="ghost" data-id="${x.id}">${x.name}</button>`).join("") +
+      v.emotions.filter((e) => e !== "neutral").map((e) => `<button class="ghost" data-emo="${e}">(${e})</button>`).join("");
+    $("dot").className = "dot ok";
+    $("statusText").textContent = `Online · ${h.voices} voices · ${v.emotions.length} emotions`;
+  } catch (e) {
+    $("dot").className = "dot bad";
+    $("statusText").textContent = e.message.includes("API key") ? "API key required — see Settings" : "Server unreachable";
+  }
+}
+
+// Insert speaker / emotion at cursor
+$("chips").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  const ta = $("sText");
+  const ins = b.dataset.id ? `\n${b.dataset.id.toUpperCase()}: ` : ` (${b.dataset.emo})`;
+  const at = ta.selectionStart;
+  ta.setRangeText(ins, at, ta.selectionEnd, "end"); ta.focus();
+  ta.dispatchEvent(new Event("input"));
+});
+
+const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function showResult(out, r, withTimeline) {
+  const warn = r.warnings.length ? `<div class="msg warn">${r.warnings.map(esc).join("<br>")}</div>` : "";
+  const tl = withTimeline ? `<ul class="timeline">${r.timeline.map((e, i) => `
+      <li data-i="${i}" data-start="${e.start_s}" data-end="${e.end_s}">
+        <span class="t">${fmt(e.start_s)}</span>
+        <span class="who">${esc(e.voice)}<small>${esc(e.emotion)}</small></span>
+        <span class="txt">${esc(e.text)}</span></li>`).join("")}</ul>` : "";
+  out.innerHTML = `${warn}<div class="result">
+      <audio controls src="${r.audio_url}"></audio>
+      <div class="meta"><span>${r.duration_s}s of audio</span><span>rendered in ${r.render_s}s</span>
+        <a href="${r.audio_url}" download="di-tts-${r.id}.wav">Download WAV</a></div>${tl}</div>`;
+  const audio = out.querySelector("audio");
+  audio.play().catch(() => {});
+  if (withTimeline) {
+    const items = [...out.querySelectorAll(".timeline li")];
+    items.forEach((li) => li.addEventListener("click", () => { audio.currentTime = +li.dataset.start; audio.play(); }));
+    audio.addEventListener("timeupdate", () => items.forEach((li) =>
+      li.classList.toggle("active", audio.currentTime >= +li.dataset.start && audio.currentTime < +li.dataset.end)));
+  }
+}
+
+async function run(btn, out, call, label) {
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "Rendering…";
+  out.innerHTML = "";
+  try {
+    const r = await call();
+    showResult(out, r, out.id === "sOut");
+    addHistory({ label, url: r.audio_url, dur: r.duration_s, at: Date.now() });
+  } catch (e) {
+    out.innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  } finally { btn.disabled = false; btn.textContent = old; }
+}
+
+$("qGo").addEventListener("click", () => run($("qGo"), $("qOut"), () => api("/api/say", {
+  text: $("qText").value, voice: $("qVoice").value, emotion: $("qEmotion").value, intensity: +$("qIntensity").value,
+}), `${$("qVoice").value} · ${$("qText").value.slice(0, 80)}`));
+$("sGo").addEventListener("click", () => run($("sGo"), $("sOut"), () => api("/api/render", { script: $("sText").value }),
+  `script · ${$("sText").value.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#")).length} lines`));
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") (!$("tab-quick").hidden ? $("qGo") : $("sGo")).click();
+});
+
+// History (per browser)
+function addHistory(item) { const h = store.get("history", []); h.unshift(item); store.set("history", h.slice(0, 15)); drawHistory(); }
+function drawHistory() {
+  const h = store.get("history", []);
+  $("history").innerHTML = h.length ? h.map((x) => `<li><button class="ghost" data-url="${x.url}">▶ Play</button>
+      <span title="${esc(x.label)}">${esc(x.label)}</span><span class="hint" style="flex:none">${x.dur}s</span></li>`).join("")
+    : `<li class="empty">Nothing yet. Your renders will appear here.</li>`;
+}
+let histAudio;
+$("history").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-url]"); if (!b) return;
+  histAudio?.pause(); histAudio = new Audio(b.dataset.url);
+  histAudio.play().catch(() => { b.textContent = "Expired"; b.disabled = true; });
+});
+drawHistory();
+init();
+</script>
+</body>
+</html>

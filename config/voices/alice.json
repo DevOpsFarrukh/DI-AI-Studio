@@ -1,0 +1,12 @@
+{
+  "id": "alice",
+  "display_name": "Alice",
+  "backend": "piper",
+  "fallback_backend": "tone",
+  "backend_options": {
+    "model": "../../models/en_US-amy-medium.onnx",
+    "voice": "en-us+f3", "wpm": 175, "pitch": 65,
+    "base_pitch_hz": 210, "syllable_ms": 145
+  },
+  "prosody": { "rate": 1.05 }
+}

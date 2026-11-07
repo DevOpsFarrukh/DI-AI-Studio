@@ -1,0 +1,33 @@
+# Production stack: the TTS app behind Caddy, which obtains HTTPS certificates automatically.
+# Usage on the server (see docs/DEPLOYMENT.md):
+#   cp deploy/.env.example deploy/.env   # set DOMAIN and DI_TTS_API_KEY
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+services:
+  tts:
+    build: ..
+    restart: unless-stopped
+    environment:
+      DI_TTS_API_KEY: ${DI_TTS_API_KEY:-}
+      DI_TTS_MAX_CHARS: ${DI_TTS_MAX_CHARS:-5000}
+    volumes:
+      - tts-out:/data/out
+    expose:
+      - "8000"          # reachable only through Caddy, not directly from the internet
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - tts
+
+volumes:
+  tts-out:
+  caddy-data:

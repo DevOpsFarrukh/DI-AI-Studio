@@ -1,0 +1,12 @@
+{
+  "id": "bob",
+  "display_name": "Bob",
+  "backend": "piper",
+  "fallback_backend": "tone",
+  "backend_options": {
+    "model": "../../models/en_US-lessac-medium.onnx",
+    "voice": "en-us+m3", "wpm": 150, "pitch": 25,
+    "base_pitch_hz": 95, "syllable_ms": 180
+  },
+  "prosody": { "rate": 0.95, "pitch_semitones": -2.0, "volume_db": -1.0 }
+}
