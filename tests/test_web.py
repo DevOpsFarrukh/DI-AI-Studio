@@ -41,6 +41,31 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/render", json={"script": "# only a comment"}).status_code, 422)
         self.assertEqual(self.client.get("/api/audio/../../etc/passwd").status_code, 404)
 
+    def test_emotion_details_are_described_honestly(self):
+        v = self.client.get("/api/voices").json()
+        details = {d["name"]: d for d in v["emotion_details"]}
+        self.assertEqual(set(details), set(v["emotions"]))
+        self.assertEqual(details["neutral"]["category"], "basic")
+        self.assertIn("realization", details["whisper"])
+        self.assertTrue(v["not_supported"])  # crying, laughing, ... are listed as unavailable
+
+    def test_say_with_analysis(self):
+        r = self.client.post("/api/say", json={"text": "Hello there.", "voice": "bob", "emotion": "sad",
+                                               "intensity": 0.5, "analyze": True}).json()
+        from di_tts import analysis
+        if analysis.available():
+            self.assertIn("speech_s", r["metrics"])
+        else:
+            self.assertNotIn("metrics", r)
+
+    def test_health_reports_broken_setup_as_503(self):
+        from unittest import mock
+        with mock.patch.object(self.web, "ffmpeg_available", return_value=False):
+            r = self.client.get("/api/health")
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["status"], "degraded")
+        self.assertTrue(any("ffmpeg" in p for p in r.json()["problems"]))
+
     def test_api_key(self):
         self.web.API_KEY = "secret"
         try:

@@ -1,14 +1,305 @@
 {
   "neutral": {
-    "description": "Baseline delivery",
+    "label": "Neutral",
+    "category": "basic",
+    "description": "The voice's normal delivery.",
     "prosody": {}
   },
   "happy": {
-    "description": "Brighter, slightly faster, slightly louder",
-    "prosody": { "rate": 1.1, "pitch_semitones": 2.0, "volume_db": 1.5 }
+    "label": "Happy",
+    "category": "basic",
+    "description": "Brighter, a little faster and higher, livelier rhythm; exclamatory at higher intensity.",
+    "prosody": {
+      "rate": 1.1,
+      "pitch_semitones": 2.0,
+      "volume_db": 1.0,
+      "rhythm_variation": 1.2
+    },
+    "text": {
+      "exclaim_at": 0.5
+    },
+    "effects": [
+      {
+        "type": "brighten",
+        "amount": 0.5
+      }
+    ]
+  },
+  "excited": {
+    "label": "Excited",
+    "category": "basic",
+    "description": "Fast, high, loud and animated with short gaps; exclamatory even at low intensity.",
+    "prosody": {
+      "rate": 1.28,
+      "pitch_semitones": 5.0,
+      "volume_db": 4.5,
+      "rhythm_variation": 1.45,
+      "pause_scale": 0.6
+    },
+    "text": {
+      "exclaim_at": 0.2
+    },
+    "effects": [
+      {
+        "type": "brighten",
+        "amount": 0.6
+      }
+    ]
   },
   "sad": {
-    "description": "Slower, lower, softer, longer pauses",
-    "prosody": { "rate": 0.85, "pitch_semitones": -2.0, "volume_db": -3.0, "pause_after_ms": 600 }
+    "label": "Sad",
+    "category": "basic",
+    "description": "Slow, low, soft and steady with long pauses between phrases; duller tone with a slight tremble; exclamations removed.",
+    "prosody": {
+      "rate": 0.74,
+      "pitch_semitones": -3.5,
+      "volume_db": -5.0,
+      "rhythm_variation": 0.55,
+      "pause_scale": 2.5,
+      "clause_pause_ms": 320,
+      "pause_after_ms": 700
+    },
+    "text": {
+      "soften_at": 0.3
+    },
+    "effects": [
+      {
+        "type": "darken",
+        "amount": 0.7
+      },
+      {
+        "type": "tremble",
+        "amount": 0.15
+      }
+    ]
+  },
+  "angry": {
+    "label": "Angry",
+    "category": "basic",
+    "description": "Loud, firm and deliberate, compressed and forward, short emphatic breaks; exclamatory.",
+    "prosody": {
+      "rate": 0.92,
+      "pitch_semitones": 0.5,
+      "volume_db": 4.5,
+      "rhythm_variation": 0.75,
+      "clause_pause_ms": 150
+    },
+    "text": {
+      "exclaim_at": 0.4
+    },
+    "effects": [
+      {
+        "type": "punch",
+        "amount": 1.0
+      }
+    ]
+  },
+  "calm": {
+    "label": "Calm",
+    "category": "basic",
+    "description": "Slower, softer, very steady, gentle pauses; exclamations removed.",
+    "prosody": {
+      "rate": 0.9,
+      "pitch_semitones": -0.5,
+      "volume_db": -3.0,
+      "rhythm_variation": 0.5,
+      "pause_scale": 1.8,
+      "clause_pause_ms": 160
+    },
+    "text": {
+      "soften_at": 0.2
+    },
+    "effects": [
+      {
+        "type": "darken",
+        "amount": 0.3
+      }
+    ]
+  },
+  "fearful": {
+    "label": "Fearful",
+    "category": "basic",
+    "description": "Quick, higher, quieter, uneven rhythm with a trembling, slightly breathy voice.",
+    "prosody": {
+      "rate": 1.12,
+      "pitch_semitones": 3.5,
+      "volume_db": -4.0,
+      "rhythm_variation": 1.5,
+      "clause_pause_ms": 150
+    },
+    "effects": [
+      {
+        "type": "tremble",
+        "amount": 0.7
+      },
+      {
+        "type": "whisper",
+        "amount": 0.35
+      }
+    ]
+  },
+  "serious": {
+    "label": "Serious",
+    "category": "advanced",
+    "description": "Measured, lower, firm and very steady with deliberate pauses; exclamations removed.",
+    "prosody": {
+      "rate": 0.9,
+      "pitch_semitones": -2.0,
+      "volume_db": 1.5,
+      "rhythm_variation": 0.45,
+      "pause_scale": 1.6,
+      "clause_pause_ms": 200
+    },
+    "text": {
+      "soften_at": 0.3
+    },
+    "effects": [
+      {
+        "type": "punch",
+        "amount": 0.25
+      }
+    ]
+  },
+  "curious": {
+    "label": "Curious",
+    "category": "advanced",
+    "description": "Higher, lively and unhurried, with a short inquisitive pause mid-sentence.",
+    "prosody": {
+      "rate": 0.9,
+      "pitch_semitones": 3.5,
+      "volume_db": 1.0,
+      "rhythm_variation": 1.3,
+      "clause_pause_ms": 170
+    },
+    "effects": [
+      {
+        "type": "brighten",
+        "amount": 0.3
+      }
+    ]
+  },
+  "nervous": {
+    "label": "Nervous",
+    "category": "advanced",
+    "description": "Hurried, uneven rhythm, slight tremble, short hesitations.",
+    "prosody": {
+      "rate": 1.2,
+      "pitch_semitones": 2.5,
+      "volume_db": -2.0,
+      "rhythm_variation": 1.6,
+      "clause_pause_ms": 100
+    },
+    "effects": [
+      {
+        "type": "tremble",
+        "amount": 0.45
+      }
+    ]
+  },
+  "dramatic": {
+    "label": "Dramatic",
+    "category": "advanced",
+    "description": "Slow, deliberate, long pauses between phrases, slight hall echo.",
+    "prosody": {
+      "rate": 0.82,
+      "pitch_semitones": -1.5,
+      "volume_db": 1.5,
+      "rhythm_variation": 0.8,
+      "pause_scale": 3.0,
+      "clause_pause_ms": 420,
+      "pause_after_ms": 800
+    },
+    "effects": [
+      {
+        "type": "reverb",
+        "amount": 0.35
+      }
+    ]
+  },
+  "urgent": {
+    "label": "Urgent",
+    "category": "advanced",
+    "description": "Fast, loud, firm, very short gaps; exclamatory.",
+    "prosody": {
+      "rate": 1.35,
+      "pitch_semitones": 2.5,
+      "volume_db": 3.0,
+      "rhythm_variation": 0.7,
+      "pause_scale": 0.5
+    },
+    "text": {
+      "exclaim_at": 0.5
+    },
+    "effects": [
+      {
+        "type": "punch",
+        "amount": 0.35
+      }
+    ]
+  },
+  "whisper": {
+    "label": "Whisper",
+    "category": "style",
+    "description": "Breathy, unvoiced, quiet. Simulated with an audio effect; lower intensity sounds breathy rather than whispered.",
+    "prosody": {
+      "rate": 0.9,
+      "volume_db": -4.0,
+      "rhythm_variation": 0.8
+    },
+    "text": {
+      "soften_at": 0.0
+    },
+    "effects": [
+      {
+        "type": "whisper",
+        "amount": 1.0
+      }
+    ]
+  },
+  "cinematic": {
+    "label": "Cinematic narration",
+    "category": "style",
+    "description": "Deep, low, steady storytelling voice with long pauses and a hall echo.",
+    "prosody": {
+      "rate": 0.88,
+      "pitch_semitones": -4.5,
+      "volume_db": 1.5,
+      "rhythm_variation": 0.7,
+      "pause_scale": 2.2,
+      "clause_pause_ms": 260
+    },
+    "effects": [
+      {
+        "type": "reverb",
+        "amount": 0.65
+      },
+      {
+        "type": "darken",
+        "amount": 0.3
+      }
+    ]
+  },
+  "news": {
+    "label": "News presenter",
+    "category": "style",
+    "description": "Crisp, even, slightly quick and very steady; no exclamations.",
+    "prosody": {
+      "rate": 1.12,
+      "volume_db": 1.0,
+      "rhythm_variation": 0.5
+    },
+    "text": {
+      "soften_at": 0.2
+    },
+    "effects": [
+      {
+        "type": "brighten",
+        "amount": 0.45
+      },
+      {
+        "type": "punch",
+        "amount": 0.3
+      }
+    ]
   }
 }

@@ -1,6 +1,12 @@
+# Keep the build context small and secrets out of the image.
 .venv
 .git
+.github
 out
 models
 **/__pycache__
-tests
+**/*.pyc
+.env
+*.env
+deploy/.env
+docs

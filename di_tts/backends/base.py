@@ -4,7 +4,8 @@ A backend turns one `Utterance` into an `AudioClip`. That is the only thing
 the rest of the system knows about speech synthesis, so engines are swappable.
 
 Backends declare which prosody controls they honour natively. For the rest,
-the engine applies a generic fallback (for example volume gain) or records a warning.
+the engine applies a generic fallback (for example an ffmpeg pitch shift) or records a warning.
+Volume is always applied by the engine after loudness normalisation, never by backends.
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ class BackendUnavailable(RuntimeError):
 
 class TTSBackend(ABC):
     name: str = "base"
-    #: subset of {"rate", "pitch_semitones", "volume_db"} handled inside synthesize()
+    #: subset of {"rate", "pitch_semitones", "rhythm_variation", "emotion"} handled inside synthesize()
     supports: frozenset[str] = frozenset()
 
     def check(self) -> None:

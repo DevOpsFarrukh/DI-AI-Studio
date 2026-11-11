@@ -60,6 +60,39 @@ def parse_script(source: str | Iterable[str], default_speaker: str = "narrator")
     return out
 
 
+_ABBREVIATIONS = {"mr", "mrs", "ms", "dr", "st", "vs", "etc", "jr", "sr", "prof", "no", "e.g", "i.e"}
+_FINAL_PERIOD_RE = re.compile(r"(?<![.])\.(?![.\w])")
+_CLAUSE_RE = re.compile(r"(?<=[,;:—–])\s+|\s+-\s+")
+
+
+def shape_text(text: str, style, intensity: float) -> str:
+    """Apply an emotion's punctuation shaping (see models.TextStyle)."""
+    if style.soften_at is not None and intensity >= style.soften_at:
+        text = re.sub(r"!+", ".", text)
+    if style.exclaim_at is not None and intensity >= style.exclaim_at:
+        def repl(m: re.Match) -> str:
+            word = re.findall(r"[\w.]+$", text[: m.start()])
+            return "." if word and word[0].lower() in _ABBREVIATIONS else "!"
+        text = _FINAL_PERIOD_RE.sub(repl, text)
+    return text
+
+
+def split_clauses(sentence: str, phrase_split: bool = False) -> list[str]:
+    """Split a sentence at , ; : — so each clause is spoken (and paused) separately.
+
+    With `phrase_split`, a sentence of 6+ words that has no such punctuation is
+    split once, before its last third, so slow deliberate emotions (sad, dramatic)
+    still get a pause ("I can't believe you actually | did that.").
+    """
+    clauses = [c.strip() for c in _CLAUSE_RE.split(sentence) if c.strip()]
+    if phrase_split and len(clauses) == 1:
+        words = sentence.split()
+        if len(words) >= 6:
+            cut = len(words) - max(2, len(words) // 3)
+            clauses = [" ".join(words[:cut]), " ".join(words[cut:])]
+    return clauses
+
+
 _SENTENCE_RE = re.compile(r"(?<=[.!?…])\s+")
 
 

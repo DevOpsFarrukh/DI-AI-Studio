@@ -31,7 +31,7 @@ def _run(cmd: list[str], stdin: str | None = None) -> None:
 
 class EspeakBackend(TTSBackend):
     name = "espeak"
-    supports = frozenset({"rate", "pitch_semitones", "volume_db"})
+    supports = frozenset({"rate", "pitch_semitones"})  # volume is applied by the engine
 
     def _exe(self) -> str:
         exe = shutil.which("espeak-ng") or shutil.which("espeak")
@@ -46,17 +46,17 @@ class EspeakBackend(TTSBackend):
         o, p = utt.voice.backend_options, utt.prosody
         wpm = int(float(o.get("wpm", 165)) * p.rate)
         pitch = int(max(0, min(99, float(o.get("pitch", 50)) + p.pitch_semitones * 4)))
-        amp = int(max(0, min(200, 100 * 10 ** (p.volume_db / 20))))
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "u.wav"
             _run([self._exe(), "-v", str(o.get("voice", "en-us")), "-s", str(wpm),
-                  "-p", str(pitch), "-a", str(amp), "-w", str(out), "--stdin"], stdin=utt.text)
+                  "-p", str(pitch), "-a", "100", "-w", str(out), "--stdin"], stdin=utt.text)
             return AudioClip.from_wav(out)
 
 
 class PiperBackend(TTSBackend):
     name = "piper"
-    supports = frozenset({"rate", "volume_db"})  # pitch is handled by the engine's fallback
+    # pitch is handled by the engine's ffmpeg fallback; no native emotion control
+    supports = frozenset({"rate", "rhythm_variation"})  # volume is applied by the engine
 
     def _exe(self) -> str:
         # $PIPER_BIN, then PATH, then next to the running interpreter (an un-activated venv)
@@ -84,10 +84,11 @@ class PiperBackend(TTSBackend):
         o = utt.voice.backend_options
         if model not in self._voices:
             self._voices[model] = PiperVoice.load(model)
+        voice = self._voices[model]
         cfg = SynthesisConfig(
             speaker_id=o.get("speaker"),
             length_scale=float(o.get("length_scale", 1.0)) / utt.prosody.rate,
-            volume=10 ** (utt.prosody.volume_db / 20),
+            noise_w_scale=float(getattr(voice.config, "noise_w_scale", 0.8)) * utt.prosody.rhythm_variation,
         )
         buf = io.BytesIO()
         with wave.open(buf, "wb") as w:
@@ -106,7 +107,7 @@ class PiperBackend(TTSBackend):
             out = Path(td) / "u.wav"
             cmd = [self._exe(), "-m", str(model), "-f", str(out),
                    "--length-scale", f"{float(o.get('length_scale', 1.0)) / utt.prosody.rate:.3f}",
-                   "--volume", f"{10 ** (utt.prosody.volume_db / 20):.3f}",
+                   "--noise-w-scale", f"{0.8 * utt.prosody.rhythm_variation:.3f}",
                    "--sentence-silence", "0"]
             if "speaker" in o:
                 cmd += ["--speaker", str(o["speaker"])]

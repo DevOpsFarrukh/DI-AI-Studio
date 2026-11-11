@@ -9,9 +9,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .models import Emotion, Prosody, VoiceProfile
+from . import effects as _effects
+from .models import EffectSpec, Emotion, Prosody, TextStyle, VoiceProfile
 
-_PROSODY_KEYS = {"rate", "pitch_semitones", "volume_db", "pause_after_ms"}
+_PROSODY_KEYS = {"rate", "pitch_semitones", "volume_db", "pause_after_ms",
+                 "pause_scale", "clause_pause_ms", "rhythm_variation"}
+_TEXT_KEYS = {"exclaim_at", "soften_at"}
+_EMOTION_KEYS = {"label", "category", "description", "prosody", "text", "effects"}
+CATEGORIES = ("basic", "advanced", "style")
 
 
 def _prosody(d: dict | None) -> Prosody:
@@ -20,6 +25,23 @@ def _prosody(d: dict | None) -> Prosody:
     if unknown:
         raise ValueError(f"unknown prosody keys: {sorted(unknown)}")
     return Prosody(**d)
+
+
+def _emotion(name: str, spec: dict) -> Emotion:
+    unknown = set(spec) - _EMOTION_KEYS
+    if unknown:
+        raise ValueError(f"emotion '{name}': unknown keys {sorted(unknown)}")
+    text = spec.get("text") or {}
+    if set(text) - _TEXT_KEYS:
+        raise ValueError(f"emotion '{name}': unknown text keys {sorted(set(text) - _TEXT_KEYS)}")
+    fx = tuple(EffectSpec(e["type"], float(e.get("amount", 1.0))) for e in spec.get("effects", []))
+    for e in fx:
+        _effects.validate(e)
+    category = spec.get("category", "basic")
+    if category not in CATEGORIES:
+        raise ValueError(f"emotion '{name}': category must be one of {CATEGORIES}")
+    return Emotion(name=name, prosody=_prosody(spec.get("prosody")), description=spec.get("description", ""),
+                   label=spec.get("label", ""), category=category, text=TextStyle(**text), effects=fx)
 
 
 class EmotionRegistry:
@@ -38,11 +60,15 @@ class EmotionRegistry:
     def names(self) -> list[str]:
         return sorted(self._emotions)
 
+    def all(self) -> list[Emotion]:
+        """Emotions in file order (neutral first), for menus."""
+        return list(self._emotions.values())
+
     @classmethod
     def from_file(cls, path: str | Path) -> "EmotionRegistry":
         reg = cls()
         for name, spec in json.loads(Path(path).read_text()).items():
-            reg.register(Emotion(name, _prosody(spec.get("prosody")), spec.get("description", "")))
+            reg.register(_emotion(name.lower(), spec))
         return reg
 
 

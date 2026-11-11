@@ -75,6 +75,30 @@
   .empty { color: var(--muted); font-size: 14px; }
   .settings { margin-top: 14px; }
   @media (max-width: 560px) { .timeline li { grid-template-columns: 56px 1fr; } .timeline li .txt { grid-column: 1 / -1; } }
+  .badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .badge.simulated { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+  .badge.approximated { color: var(--accent); background: var(--soft); border-color: transparent; }
+  .emo-note { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 20px; }
+  .emo-note .badge { margin-right: 6px; }
+  .inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .inline select { width: auto; padding: 6px 10px; font-size: 13px; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: none; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--soft); color: var(--ink); font-weight: 600; }
+  .checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; }
+  .checks label { display: flex; gap: 6px; align-items: center; color: var(--ink); font-size: 14px; margin: 0; }
+  .checks h4 { width: 100%; margin: 8px 0 0; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .lab-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-top: 16px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
+  .card.ref { border-color: var(--accent); }
+  .card h3 { font-size: 14px; margin: 0; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .card audio { width: 100%; height: 36px; margin: 8px 0 6px; }
+  .card .m { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.7; }
+  .card .m b { color: var(--ink); font-weight: 600; }
+  .card.pending { opacity: .55; }
+  .legend { font-size: 13px; color: var(--muted); margin-top: 14px; line-height: 1.7; }
 </style>
 </head>
 <body>
@@ -87,6 +111,7 @@
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true" data-tab="quick">Quick speak</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="script">Script studio</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="lab">Emotion Lab</button>
   </div>
 
   <!-- Quick speak -->
@@ -99,6 +124,7 @@
       <div><label for="qIntensity">Intensity <span id="qIntVal">1.0</span></label>
         <input type="range" id="qIntensity" min="0" max="1" step="0.1" value="1"></div>
     </div>
+    <div class="emo-note" id="qEmoNote"></div>
     <div class="actions">
       <button class="primary" id="qGo">Speak</button>
       <span class="hint">Ctrl + Enter</span>
@@ -109,8 +135,15 @@
 
   <!-- Script studio -->
   <section class="panel" id="tab-script" hidden>
-    <label>Insert a speaker</label>
+    <label>Insert a speaker or emotion</label>
     <div class="chips" id="chips"></div>
+    <div class="inline" style="margin-bottom:10px">
+      <select id="sEmotion" aria-label="Emotion to insert"></select>
+      <select id="sIntensity" aria-label="Intensity">
+        <option value="">full</option><option>0.3</option><option>0.5</option><option>0.8</option>
+      </select>
+      <button class="ghost" id="sInsertEmo">Insert emotion</button>
+    </div>
     <textarea id="sText" class="script" spellcheck="false"></textarea>
     <p class="hint">One line per utterance: <code>NAME: text</code> or <code>NAME (emotion:0.6): text</code>.
       Lines starting with <code>#</code> are comments. An indented line continues the previous speaker.</p>
@@ -120,6 +153,42 @@
       <span class="count" id="sCount"></span>
     </div>
     <div id="sOut"></div>
+  </section>
+
+  <!-- Emotion Lab -->
+  <section class="panel" id="tab-lab" hidden>
+    <label for="lText">Test sentence</label>
+    <input type="text" id="lText" value="I can't believe you actually did that.">
+    <div class="presets">
+      <button class="ghost" data-preset="I can't believe you actually did that.">“I can't believe you actually did that.”</button>
+      <button class="ghost" data-preset="Finally, we did it.">“Finally, we did it.”</button>
+      <button class="ghost" data-preset="Bob, did you hear that? Something is happening outside!">“Bob, did you hear that?…”</button>
+    </div>
+    <div class="row">
+      <div><label for="lVoice">Voice</label><select id="lVoice"></select></div>
+      <div><label>Mode</label>
+        <div class="seg" role="group">
+          <button id="mCompare" aria-pressed="true">Compare emotions</button>
+          <button id="mSweep" aria-pressed="false">Intensity sweep</button>
+        </div></div>
+    </div>
+    <div id="lCompareOpts">
+      <div class="row"><div><label for="lIntensity">Intensity <span id="lIntVal">1.0</span></label>
+        <input type="range" id="lIntensity" min="0.1" max="1" step="0.1" value="1"></div></div>
+      <div class="inline" style="margin-top:12px"><label style="margin:0">Emotions</label>
+        <button class="ghost" id="lAll">All</button><button class="ghost" id="lNone">None</button></div>
+      <div class="checks" id="lChecks"></div>
+    </div>
+    <div id="lSweepOpts" hidden>
+      <div class="row"><div><label for="lSweepEmo">Emotion</label><select id="lSweepEmo"></select></div></div>
+      <p class="hint">Renders 0.2, 0.5, 0.8 and 1.0, plus neutral as a reference.</p>
+    </div>
+    <div class="actions">
+      <button class="primary" id="lGo">Run comparison</button>
+      <span class="hint" id="lProgress"></span>
+    </div>
+    <div class="lab-grid" id="lGrid"></div>
+    <div class="legend" id="lLegend"></div>
   </section>
 
   <section class="history">
@@ -167,13 +236,37 @@ async function api(path, body) {
 }
 
 // Tabs
+const TABS = ["quick", "script", "lab"];
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", x === t));
-  $("tab-quick").hidden = t.dataset.tab !== "quick";
-  $("tab-script").hidden = t.dataset.tab !== "script";
+  TABS.forEach((k) => { $(`tab-${k}`).hidden = t.dataset.tab !== k; });
   store.set("tab", t.dataset.tab);
 }));
-if (store.get("tab") === "script") document.querySelector('[data-tab="script"]').click();
+// a link like /#lab opens that tab; otherwise reopen the last one used
+const startTab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get("tab");
+if (TABS.includes(startTab) && startTab !== "quick") document.querySelector(`[data-tab="${startTab}"]`).click();
+addEventListener("hashchange", () => {
+  const t = location.hash.slice(1);
+  if (TABS.includes(t)) document.querySelector(`[data-tab="${t}"]`).click();
+});
+
+// Emotions (filled from /api/voices)
+let EMO = [], NOT_SUPPORTED = [], BACKEND = "";
+const CAT = { basic: "Basic emotions", advanced: "Advanced emotions", style: "Delivery styles" };
+const emo = (n) => EMO.find((e) => e.name === n) || { name: n, label: n, realization: "", description: "" };
+const badge = (e) => e.realization
+  ? `<span class="badge ${e.realization}" title="${esc(e.realization_notes || "")}">${e.realization}</span>` : "";
+function emotionOptions(skipNeutral) {
+  return Object.keys(CAT).map((c) => {
+    const items = EMO.filter((e) => e.category === c && !(skipNeutral && e.name === "neutral"));
+    return items.length ? `<optgroup label="${CAT[c]}">${items.map((e) =>
+      `<option value="${e.name}">${esc(e.label)}</option>`).join("")}</optgroup>` : "";
+  }).join("");
+}
+function drawEmoNote() {
+  const e = emo($("qEmotion").value);
+  $("qEmoNote").innerHTML = `${badge(e)}${esc(e.description || "")}`;
+}
 
 // Character counters
 function counter(ta, el) {
@@ -192,9 +285,15 @@ async function init() {
     const v = await api("/api/voices");
     maxChars = v.max_chars; counters.forEach((f) => f());
     $("qVoice").innerHTML = v.voices.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
-    $("qEmotion").innerHTML = v.emotions.map((e) => `<option${e === "neutral" ? " selected" : ""}>${e}</option>`).join("");
-    $("chips").innerHTML = v.voices.map((x) => `<button class="ghost" data-id="${x.id}">${x.name}</button>`).join("") +
-      v.emotions.filter((e) => e !== "neutral").map((e) => `<button class="ghost" data-emo="${e}">(${e})</button>`).join("");
+    EMO = v.emotion_details || v.emotions.map((n) => ({ name: n, label: n, category: "basic" }));
+    NOT_SUPPORTED = v.not_supported || [];
+    BACKEND = v.backend || "";
+    $("qEmotion").innerHTML = emotionOptions(false); $("qEmotion").value = "neutral";
+    $("sEmotion").innerHTML = emotionOptions(true);
+    $("lSweepEmo").innerHTML = emotionOptions(true); $("lSweepEmo").value = EMO.some((e) => e.name === "sad") ? "sad" : $("lSweepEmo").value;
+    $("lVoice").innerHTML = $("qVoice").innerHTML;
+    $("chips").innerHTML = v.voices.map((x) => `<button class="ghost" data-id="${x.id}">${x.name}</button>`).join("");
+    drawEmoNote(); drawChecks(); drawLegend();
     $("dot").className = "dot ok";
     $("statusText").textContent = `Online · ${h.voices} voices · ${v.emotions.length} emotions`;
   } catch (e) {
@@ -211,6 +310,108 @@ $("chips").addEventListener("click", (ev) => {
   const at = ta.selectionStart;
   ta.setRangeText(ins, at, ta.selectionEnd, "end"); ta.focus();
   ta.dispatchEvent(new Event("input"));
+});
+
+$("qEmotion").addEventListener("change", drawEmoNote);
+
+// Script studio: put "(emotion:intensity)" after the speaker name on the cursor's line
+$("sInsertEmo").addEventListener("click", () => {
+  const ta = $("sText"), i = $("sIntensity").value;
+  const tag = `(${$("sEmotion").value}${i ? ":" + i : ""})`;
+  const start = ta.value.lastIndexOf("\n", ta.selectionStart - 1) + 1;
+  let end = ta.value.indexOf("\n", start); if (end < 0) end = ta.value.length;
+  const line = ta.value.slice(start, end);
+  const m = line.match(/^(\s*[A-Za-z][\w .'-]{0,40}?)\s*(\([^)]*\))?\s*:/);
+  if (m) {
+    ta.setRangeText(`${m[1]} ${tag}:`, start, start + m[0].length, "end");
+  } else {
+    ta.setRangeText(` ${tag}`, ta.selectionStart, ta.selectionEnd, "end");
+  }
+  ta.focus(); ta.dispatchEvent(new Event("input"));
+});
+
+// Emotion Lab
+let labMode = "compare", labBusy = false;
+function drawChecks() {
+  $("lChecks").innerHTML = Object.keys(CAT).map((c) => {
+    const items = EMO.filter((e) => e.category === c && e.name !== "neutral");
+    return items.length ? `<h4>${CAT[c]}</h4>` + items.map((e) =>
+      `<label><input type="checkbox" value="${e.name}" checked> ${esc(e.label)}</label>`).join("") : "";
+  }).join("");
+}
+function drawLegend() {
+  $("lLegend").innerHTML = `<b>How each emotion is made${BACKEND ? ` on ${esc(BACKEND)}` : ""}:</b>
+    <span class="badge">baseline</span> the voice as it is ·
+    <span class="badge approximated">approximated</span> speed, pitch, volume, pauses and punctuation ·
+    <span class="badge simulated">simulated</span> those plus audio effects (an effect, not genuine emotional speech).`
+    + (NOT_SUPPORTED.length ? `<br>Not possible with the current engine: ${NOT_SUPPORTED.map(esc).join(", ")}.` : "")
+    + `<br>Numbers are measured from the generated audio; brackets compare with neutral. Piper varies by about ±5% between runs.`;
+}
+function setMode(m) {
+  labMode = m;
+  $("mCompare").setAttribute("aria-pressed", m === "compare");
+  $("mSweep").setAttribute("aria-pressed", m === "sweep");
+  $("lCompareOpts").hidden = m !== "compare";
+  $("lSweepOpts").hidden = m !== "sweep";
+}
+$("mCompare").addEventListener("click", () => setMode("compare"));
+$("mSweep").addEventListener("click", () => setMode("sweep"));
+$("lAll").addEventListener("click", () => $("lChecks").querySelectorAll("input").forEach((c) => { c.checked = true; }));
+$("lNone").addEventListener("click", () => $("lChecks").querySelectorAll("input").forEach((c) => { c.checked = false; }));
+$("lIntensity").addEventListener("input", () => $("lIntVal").textContent = (+$("lIntensity").value).toFixed(1));
+document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => { $("lText").value = b.dataset.preset; }));
+
+const sign = (x, d = 0) => (x > 0 ? "+" : "") + x.toFixed(d);
+function metricsHtml(m, ref) {
+  if (!m) return "Measurements unavailable on this server.";
+  const rel = (k, f) => (ref && ref[k] && m[k] && m !== ref) ? ` <span>(${f(m[k], ref[k])})</span>` : "";
+  const pct = (a, b) => sign((a / b - 1) * 100) + "%";
+  const st = (a, b) => sign(12 * Math.log2(a / b), 1) + " st";
+  const db = (a, b) => sign(a - b, 1) + " dB";
+  return [
+    `Length <b>${m.speech_s}s</b>${rel("speech_s", pct)}`,
+    m.voiced_ratio >= 0.45 && m.pitch_hz ? `Pitch <b>${m.pitch_hz} Hz</b>${rel("pitch_hz", st)}` : "Pitch <b>–</b> (mostly unvoiced)",
+    m.voiced_ratio >= 0.45 && m.pitch_range_st != null ? `Melody range <b>${m.pitch_range_st} st</b>` : "",
+    `Loudness <b>${m.loudness_db} dB</b>${rel("loudness_db", db)}`,
+    `Brightness <b>${m.brightness_hz} Hz</b>${rel("brightness_hz", pct)}`,
+    `Voiced <b>${Math.round(m.voiced_ratio * 100)}%</b>`,
+  ].filter(Boolean).join("<br>");
+}
+
+$("lGo").addEventListener("click", async () => {
+  if (labBusy) return;
+  const text = $("lText").value.trim(), voice = $("lVoice").value;
+  if (!text) return;
+  let jobs = [{ emotion: "neutral", intensity: 1, ref: true }];
+  if (labMode === "compare") {
+    const lvl = +$("lIntensity").value;
+    jobs = jobs.concat([...$("lChecks").querySelectorAll("input:checked")].map((c) => ({ emotion: c.value, intensity: lvl })));
+  } else {
+    jobs = jobs.concat([0.2, 0.5, 0.8, 1.0].map((x) => ({ emotion: $("lSweepEmo").value, intensity: x })));
+  }
+  labBusy = true; $("lGo").disabled = true;
+  $("lGrid").innerHTML = jobs.map((j, i) => {
+    const e = emo(j.emotion);
+    return `<div class="card pending${j.ref ? " ref" : ""}" id="lc${i}"><h3><span>${esc(e.label)}${j.ref ? " · reference" : ` · ${j.intensity.toFixed(1)}`}</span>${badge(e)}</h3>
+      <div class="m">Waiting…</div></div>`;
+  }).join("");
+  let ref = null;
+  for (let i = 0; i < jobs.length; i++) {
+    $("lProgress").textContent = `Rendering ${i + 1} of ${jobs.length}…`;
+    const card = $(`lc${i}`), body = card.querySelector(".m");
+    body.textContent = "Rendering…";
+    try {
+      const r = await api("/api/say", { text, voice, emotion: jobs[i].emotion, intensity: jobs[i].intensity, analyze: true });
+      if (jobs[i].ref) ref = r.metrics;
+      body.insertAdjacentHTML("beforebegin", `<audio controls preload="none" src="${r.audio_url}"></audio>`);
+      body.innerHTML = metricsHtml(r.metrics, ref) + (r.warnings.length ? `<div class="msg warn">${r.warnings.map(esc).join("<br>")}</div>` : "");
+    } catch (e) {
+      body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+    }
+    card.classList.remove("pending");
+  }
+  $("lProgress").textContent = `Done: ${jobs.length} versions of the same sentence with the same voice.`;
+  labBusy = false; $("lGo").disabled = false;
 });
 
 const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;

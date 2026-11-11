@@ -14,6 +14,7 @@ Settings (environment variables, so the same code runs locally and in production
 """
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -21,11 +22,13 @@ import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from ..backends import BackendUnavailable
+from .. import analysis
+from ..audio import ffmpeg_available
+from ..backends import BackendUnavailable, create_backend
 from ..engine import RenderResult, TTSEngine
 from ..models import ScriptLine
 from ..script import ScriptError, parse_script
@@ -43,7 +46,12 @@ engine = TTSEngine.from_config_dir(CONFIG)
 # Model inference is CPU-bound and backends cache loaded models; serialise renders.
 _render_lock = threading.Lock()
 
-app = FastAPI(title="DI-AI-Studio TTS", version="0.2.0")
+app = FastAPI(title="DI-AI-Studio TTS", version="0.3.0")
+log = logging.getLogger("uvicorn.error")
+
+if not API_KEY and os.environ.get("DI_TTS_HOST", "127.0.0.1") not in ("127.0.0.1", "localhost"):
+    log.warning("DI_TTS_API_KEY is not set and the server is reachable from the network: "
+                "anyone who can reach it can use it. Set DI_TTS_API_KEY for any shared or cloud deployment.")
 
 
 def require_key(x_api_key: str | None = Header(default=None)) -> None:
@@ -56,6 +64,11 @@ class SayRequest(BaseModel):
     voice: str = "narrator"
     emotion: str = "neutral"
     intensity: float = Field(default=1.0, ge=0.0, le=1.0)
+    analyze: bool = False  # include acoustic measurements (Emotion Lab)
+
+
+# Deliveries the current Piper-based setup cannot produce, shown in the UI so nobody expects them.
+NOT_SUPPORTED = ["crying", "laughing", "sarcasm", "true shouting", "genuine whispering (only simulated)"]
 
 
 class ScriptRequest(BaseModel):
@@ -74,7 +87,15 @@ def _cleanup() -> None:
         f.with_suffix(".timeline.json").unlink(missing_ok=True)
 
 
-def _run(lines: list[ScriptLine]) -> dict:
+def _default_backend() -> str:
+    """Backend whose capabilities the UI describes: the override, else the most common voice backend."""
+    if engine.backend_override:
+        return engine.backend_override
+    names = [v.backend for v in engine.voices.all()]
+    return max(set(names), key=names.count) if names else "tone"
+
+
+def _run(lines: list[ScriptLine], analyze: bool = False) -> dict:
     t0 = time.perf_counter()
     try:
         with _render_lock:
@@ -86,7 +107,7 @@ def _run(lines: list[ScriptLine]) -> dict:
     rid = uuid.uuid4().hex[:16]
     result.save(OUTPUT / f"{rid}.wav")
     _cleanup()
-    return {
+    out = {
         "id": rid,
         "audio_url": f"/api/audio/{rid}.wav",
         "duration_s": round(result.audio.duration_s, 2),
@@ -94,18 +115,53 @@ def _run(lines: list[ScriptLine]) -> dict:
         "warnings": result.warnings,
         "timeline": [e.__dict__ for e in result.timeline],
     }
+    if analyze and analysis.available():
+        out["metrics"] = analysis.measure(result.audio)
+    return out
 
 
 @app.get("/api/health")
-def health() -> dict:
-    return {"status": "ok", "voices": len(engine.voices.all()), "auth": bool(API_KEY)}
+def health():
+    """Readiness check for Docker, ECS and load balancers.
+
+    200 when every voice can actually be rendered (backend present, model file on
+    disk) and ffmpeg is available for pitch and effects; 503 with the problems
+    otherwise, so a broken image is never put into service.
+    """
+    problems = []
+    for v in engine.voices.all():
+        name = engine.backend_override or v.backend
+        try:
+            create_backend(name).check()
+        except (BackendUnavailable, KeyError) as e:
+            problems.append(f"voice '{v.id}': {e}")
+            continue
+        model = v.backend_options.get("model")
+        if name == "piper" and (not model or not Path(model).exists()):
+            problems.append(f"voice '{v.id}': model file missing: {model}")
+    if not ffmpeg_available():
+        problems.append("ffmpeg not installed: pitch changes and emotion effects unavailable")
+    body = {"status": "ok" if not problems else "degraded", "voices": len(engine.voices.all()),
+            "emotions": len(engine.emotions.names()), "auth": bool(API_KEY), "problems": problems}
+    return JSONResponse(body, status_code=200 if not problems else 503)
 
 
 @app.get("/api/voices", dependencies=[Depends(require_key)])
 def voices() -> dict:
+    backend = _default_backend()
+    details = []
+    for e in engine.emotions.all():
+        r = engine.realization(e.name, backend)
+        details.append({"name": e.name, "label": e.display, "category": e.category,
+                        "description": e.description, "realization": r["level"],
+                        "realization_notes": r["notes"], "available": r["available"]})
     return {
         "voices": [{"id": v.id, "name": v.display_name, "backend": v.backend} for v in engine.voices.all()],
-        "emotions": engine.emotions.names(),
+        "emotions": engine.emotions.names(),  # kept for backward compatibility
+        "emotion_details": details,
+        "backend": backend,
+        "not_supported": NOT_SUPPORTED,
+        "analysis": analysis.available(),
         "max_chars": MAX_CHARS,
     }
 
@@ -114,7 +170,7 @@ def voices() -> dict:
 def say(req: SayRequest) -> dict:
     text = " ".join(req.text.split())
     _check_len(text)
-    return _run([ScriptLine(req.voice.lower(), text, req.emotion.lower(), req.intensity, 1)])
+    return _run([ScriptLine(req.voice.lower(), text, req.emotion.lower(), req.intensity, 1)], analyze=req.analyze)
 
 
 @app.post("/api/render", dependencies=[Depends(require_key)])
