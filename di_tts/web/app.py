@@ -14,6 +14,7 @@ Settings (environment variables, so the same code runs locally and in production
 """
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -21,12 +22,13 @@ import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import analysis
-from ..backends import BackendUnavailable
+from ..audio import ffmpeg_available
+from ..backends import BackendUnavailable, create_backend
 from ..engine import RenderResult, TTSEngine
 from ..models import ScriptLine
 from ..script import ScriptError, parse_script
@@ -44,7 +46,12 @@ engine = TTSEngine.from_config_dir(CONFIG)
 # Model inference is CPU-bound and backends cache loaded models; serialise renders.
 _render_lock = threading.Lock()
 
-app = FastAPI(title="DI-AI-Studio TTS", version="0.2.0")
+app = FastAPI(title="DI-AI-Studio TTS", version="0.3.0")
+log = logging.getLogger("uvicorn.error")
+
+if not API_KEY and os.environ.get("DI_TTS_HOST", "127.0.0.1") not in ("127.0.0.1", "localhost"):
+    log.warning("DI_TTS_API_KEY is not set and the server is reachable from the network: "
+                "anyone who can reach it can use it. Set DI_TTS_API_KEY for any shared or cloud deployment.")
 
 
 def require_key(x_api_key: str | None = Header(default=None)) -> None:
@@ -114,8 +121,29 @@ def _run(lines: list[ScriptLine], analyze: bool = False) -> dict:
 
 
 @app.get("/api/health")
-def health() -> dict:
-    return {"status": "ok", "voices": len(engine.voices.all()), "auth": bool(API_KEY)}
+def health():
+    """Readiness check for Docker, ECS and load balancers.
+
+    200 when every voice can actually be rendered (backend present, model file on
+    disk) and ffmpeg is available for pitch and effects; 503 with the problems
+    otherwise, so a broken image is never put into service.
+    """
+    problems = []
+    for v in engine.voices.all():
+        name = engine.backend_override or v.backend
+        try:
+            create_backend(name).check()
+        except (BackendUnavailable, KeyError) as e:
+            problems.append(f"voice '{v.id}': {e}")
+            continue
+        model = v.backend_options.get("model")
+        if name == "piper" and (not model or not Path(model).exists()):
+            problems.append(f"voice '{v.id}': model file missing: {model}")
+    if not ffmpeg_available():
+        problems.append("ffmpeg not installed: pitch changes and emotion effects unavailable")
+    body = {"status": "ok" if not problems else "degraded", "voices": len(engine.voices.all()),
+            "emotions": len(engine.emotions.names()), "auth": bool(API_KEY), "problems": problems}
+    return JSONResponse(body, status_code=200 if not problems else 503)
 
 
 @app.get("/api/voices", dependencies=[Depends(require_key)])

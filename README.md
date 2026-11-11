@@ -35,6 +35,8 @@ Without Piper or the models, each voice falls back to the built-in `tone` backen
 
 To run it on your own domain with HTTPS, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). It covers Docker, Caddy and the API key.
 
+**AWS:** see [docs/AWS.md](docs/AWS.md) for EC2 or ECS Fargate, pushing to ECR, sizing and the current limits. `deploy/smoke-test.sh <url> [api-key]` checks any running deployment end to end.
+
 ## Script format
 
 ```text

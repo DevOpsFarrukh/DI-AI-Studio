@@ -26,7 +26,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m di_tts render script.txt --backend tone    # force one backend for all voices
 .venv/bin/python -m di_tts lab -v alice -e sad,happy -i 0.2,1.0  # render + measure emotions (out/lab/)
 
+docker build --target test -t di-tts:test .                 # runs the whole test suite inside the image
 docker build -t di-tts . && docker run --rm -p 8000:8000 di-tts
+deploy/smoke-test.sh http://127.0.0.1:8000 [API_KEY]        # end-to-end check of any running deployment
 ```
 
 There is no linter or formatter configured.
@@ -76,7 +78,12 @@ Key points that span several files:
   - Audio is served at `/api/audio/<16-hex>.wav` without auth, by unguessable ID.
   - The UI is one dependency-free file, `di_tts/web/static/index.html`.
   - Tests monkeypatch `web.engine.backend_override` and `web.API_KEY`.
-- **Deployment:** `deploy/` holds docker-compose with Caddy for automatic HTTPS. See `docs/DEPLOYMENT.md`. The Docker image includes the voice models.
+- **Deployment:**
+  - `deploy/` holds docker-compose with Caddy for automatic HTTPS (`docs/DEPLOYMENT.md`).
+  - AWS: `docs/AWS.md`, `deploy/aws/push-to-ecr.sh` and `deploy/aws/ecs-task-definition.json`.
+  - The Dockerfile has three stages, `base` → `test` (runs unittest) → `runtime` (the default); the image includes the voice models.
+  - `/api/health` is a readiness check: it returns 503 if any voice's backend or model, or ffmpeg, is missing.
+  - The app must run as a **single instance**, because audio files live on local disk.
 
 ## Project rules
 

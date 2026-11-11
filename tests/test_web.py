@@ -58,6 +58,14 @@ class WebApiTests(unittest.TestCase):
         else:
             self.assertNotIn("metrics", r)
 
+    def test_health_reports_broken_setup_as_503(self):
+        from unittest import mock
+        with mock.patch.object(self.web, "ffmpeg_available", return_value=False):
+            r = self.client.get("/api/health")
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["status"], "degraded")
+        self.assertTrue(any("ffmpeg" in p for p in r.json()["problems"]))
+
     def test_api_key(self):
         self.web.API_KEY = "secret"
         try:

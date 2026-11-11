@@ -1,0 +1,42 @@
+{
+  "family": "di-ai-studio-tts",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "runtimePlatform": { "cpuArchitecture": "X86_64", "operatingSystemFamily": "LINUX" },
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "tts",
+      "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/di-ai-studio-tts:<TAG>",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "DI_TTS_MAX_CHARS", "value": "5000" },
+        { "name": "DI_TTS_KEEP_FILES", "value": "200" },
+        { "name": "DI_TTS_KEEPALIVE_S", "value": "65" }
+      ],
+      "secrets": [
+        { "name": "DI_TTS_API_KEY", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/di-ai-studio/api-key" }
+      ],
+      "healthCheck": {
+        "command": ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "stopTimeout": 30,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/di-ai-studio-tts",
+          "awslogs-region": "<REGION>",
+          "awslogs-stream-prefix": "tts",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}

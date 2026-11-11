@@ -2,9 +2,15 @@
 # Usage on the server (see docs/DEPLOYMENT.md):
 #   cp deploy/.env.example deploy/.env   # set DOMAIN and DI_TTS_API_KEY
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+# Or, with an image already pushed to ECR (TTS_IMAGE set in deploy/.env), skip building:
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env pull tts
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --no-build
 services:
   tts:
-    build: ..
+    build:
+      context: ..
+      target: runtime
+    image: ${TTS_IMAGE:-di-tts:latest}
     restart: unless-stopped
     environment:
       DI_TTS_API_KEY: ${DI_TTS_API_KEY:-}
